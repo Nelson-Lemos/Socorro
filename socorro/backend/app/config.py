@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE: int = 10485760
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = ""
 
     MULTICAIXA_API_KEY: str = ""
     MULTICAIXA_SECRET: str = ""
