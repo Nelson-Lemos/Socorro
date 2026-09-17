@@ -151,6 +151,20 @@ export interface StatusVerificacao {
   verificavel: boolean
 }
 
+export function getWebSocketUrl(pedidoId: string): string {
+  const apiBase = (import.meta.env.VITE_API_URL || '').trim()
+  let host: string
+  if (apiBase.startsWith('http')) {
+    host = apiBase.replace(/^https?:\/\//, '').split('/')[0]
+  } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    host = window.location.host
+  } else {
+    host = 'back-socorro.onrender.com'
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${host}/chat/${pedidoId}/ws`
+}
+
 export const authApi = {
   register: async (data: UserCreate) => {
     const res = await api.post('/auth/register', data)

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Send, Circle, MessageCircle } from 'lucide-react'
-import { api } from '../api'
+import { api, getWebSocketUrl } from '../api'
 import { useAuth } from '../context/AuthContext'
 
 interface Mensagem {
@@ -52,8 +52,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!id || !token) return
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.host}/chat/${id}/ws?token=${token}`
+    const wsUrl = `${getWebSocketUrl(id)}?token=${token}`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
