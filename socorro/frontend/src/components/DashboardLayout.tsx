@@ -3,16 +3,19 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import BottomNav from './BottomNav'
 import {
-  LayoutDashboard, PlusCircle, FileText,
-  LogOut, Menu, X, Sun, Moon, User, Bell, ChevronRight
+  LayoutDashboard, PlusCircle, Map as MapIcon, ClipboardList, User,
+  LogOut, Menu, X, Sun, Moon, Bell, ChevronRight,
 } from 'lucide-react'
 import logoUrl from '../assets/logo.jpeg'
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Início', icon: LayoutDashboard },
+  { path: '/mapa', label: 'Mapa', icon: MapIcon },
+  { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
   { path: '/pedir-socorro', label: 'Pedir Socorro', icon: PlusCircle },
-  { path: '/documentos', label: 'Documentos', icon: FileText },
+  { path: '/perfil', label: 'Perfil', icon: User },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -181,9 +184,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </AnimatePresence>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0 min-h-screen">
+      <main className="flex-1 lg:ml-64 pt-16 lg:pt-0 min-h-screen pb-20 lg:pb-0">
         {children}
       </main>
+
+      {/* Mobile bottom navigation */}
+      <BottomNav />
     </div>
   )
 }

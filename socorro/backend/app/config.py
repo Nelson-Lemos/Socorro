@@ -18,10 +18,6 @@ class Settings(BaseSettings):
     UNITEL_MONEY_API_KEY: str = ""
     AFRIMONEY_API_KEY: str = ""
 
-    AT_API_KEY: str = ""
-    AT_USERNAME: str = ""
-    AT_SENDER_ID: str = ""
-
     class Config:
         env_file = ".env"
         extra = "ignore"

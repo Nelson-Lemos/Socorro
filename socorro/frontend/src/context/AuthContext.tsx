@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { authApi } from '../api'
-import type { UserOut } from '../api'
+import type { UserCreate, UserOut } from '../api'
 
 interface AuthCtx {
   user: UserOut | null
@@ -38,8 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }
 
-  const register = async (formData: any) => {
-    const data = await authApi.register(formData)
+  const register = async (formData: Partial<UserCreate>) => {
+    const data = await authApi.register(formData as UserCreate)
     localStorage.setItem('socorro_token', data.access_token)
     setToken(data.access_token)
     setUser(data.user)

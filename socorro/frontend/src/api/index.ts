@@ -27,12 +27,45 @@ export interface UserCreate {
   telefone?: string
   tipo_conta: string
   localizacao?: string
+  latitude?: number
+  longitude?: number
   password: string
   idade?: number
   genero?: string
   competencias?: string
   nif?: string
   area_atuacao?: string
+  especialidades?: string
+  anos_experiencia?: number
+  descricao?: string
+  disponibilidade?: string
+  raio_atuacao?: number
+  /* Empresa — perfil comercial (3 passos) */
+  nome_comercial?: string
+  tipo_entidade?: string      // empresa | eni | oficina | prestador
+  logo?: string
+  foto_capa?: string
+  telefone_whatsapp?: string
+  website?: string
+  redes_sociais?: string
+  provincia?: string
+  municipio?: string
+  bairro?: string
+  endereco?: string
+  ponto_referencia?: string
+  categorias_servico?: string
+  atende_estabelecimento?: boolean
+  atende_domicilio?: boolean
+  areas_atendidas?: string
+  horario_atendimento?: string
+  atendimento_24h?: boolean
+  representante_nome?: string
+  representante_cargo?: string
+  representante_telefone?: string
+  certidao_comercial_url?: string
+  doc_representante_url?: string
+  licenca_url?: string
+  status_verificacao?: string
 }
 
 export interface UserOut {
@@ -49,12 +82,14 @@ export interface UserOut {
   competencias?: string
   nif?: string
   area_atuacao?: string
+  especialidades?: string
+  anos_experiencia?: number
+  status_atendimento?: string
   foto_perfil?: string
   descricao?: string
   disponibilidade?: string
   raio_atuacao?: number
   verificado: boolean
-  email_verificado: boolean
   telefone_verificado: boolean
   criado_em: string
 }
@@ -66,7 +101,14 @@ export interface PedidoCreate {
   localizacao: string
   latitude?: number
   longitude?: number
+  referencia?: string
+  prestador_id?: string
   urgencia: string
+}
+
+export interface OrcamentoItemOut {
+  descricao: string
+  valor: number
 }
 
 export interface PedidoOut {
@@ -75,6 +117,7 @@ export interface PedidoOut {
   categoria: string
   descricao: string
   localizacao: string
+  referencia?: string
   latitude?: number
   longitude?: number
   urgencia: string
@@ -84,6 +127,11 @@ export interface PedidoOut {
   prestador_id?: string
   valor?: number
   valor_acordado?: number
+  orcamento_status?: string
+  orcamento_itens?: OrcamentoItemOut[] | null
+  orcamento_nota?: string
+  orcamento_enviado_em?: string
+  orcamento_aprovado_em?: string
   criado_em: string
   aceito_em?: string
   concluido_em?: string
@@ -130,28 +178,70 @@ export interface AvaliacaoOut {
   avaliador_nome?: string
 }
 
-export interface DocumentoOut {
+export interface ProfissionalOut {
   id: string
-  tipo: string
-  nome_ficheiro: string
-  status: string
-  motivo_rejeicao?: string
-  criado_em: string
-}
-
-export interface StatusVerificacao {
+  nome: string
   tipo_conta: string
-  documentos_requeridos: string[]
-  documentos_enviados: string[]
-  documentos_faltantes: string[]
-  documentos_pendentes: string[]
-  documentos_aprovados: string[]
-  todos_enviados: boolean
-  todos_aprovados: boolean
-  verificavel: boolean
+  foto_perfil?: string
+  descricao?: string
+  area_atuacao?: string
+  competencias?: string
+  especialidades?: string
+  anos_experiencia?: number
+  localizacao?: string
+  latitude?: number
+  longitude?: number
+  raio_atuacao?: number
+  verificado: boolean
+  status_atendimento?: string
+  dist_km?: number
+  avaliacao_media?: number
+  total_avaliacoes: number
+  // Empresa — identidade comercial
+  nome_comercial?: string
+  logo?: string
+  foto_capa?: string
+  categorias_servico?: string
+  areas_atendidas?: string
+  atendimento_estabelecimento?: boolean
+  atendimento_domicilio?: boolean
+  atendimento_24h?: boolean
+  telefone_whatsapp?: string
+  website?: string
+  provincia?: string
+  municipio?: string
+  bairro?: string
+  representante_nome?: string
+  representante_cargo?: string
+  representante_telefone?: string
 }
 
-export function getWebSocketUrl(pedidoId: string): string {
+export interface AvaliacaoProfissional {
+  id: string
+  estrelas: number
+  comentario?: string
+  criado_em?: string
+  avaliador_nome?: string
+}
+
+export interface PotencialPrestador {
+  id: string
+  nome: string
+  foto_perfil?: string
+  latitude?: number
+  longitude?: number
+  atualizado_em?: string
+}
+
+export interface TrackingOut {
+  pedido: PedidoOut
+  status: string
+  prestador?: PotencialPrestador | null
+  distancia_km?: number
+  eta_min?: number
+}
+
+function getWSSBase(): string {
   const apiBase = (import.meta.env.VITE_API_URL || '').trim()
   let host: string
   if (apiBase.startsWith('http')) {
@@ -162,7 +252,15 @@ export function getWebSocketUrl(pedidoId: string): string {
     host = 'back-socorro.onrender.com'
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${host}/chat/${pedidoId}/ws`
+  return `${protocol}//${host}`
+}
+
+export function getWebSocketUrl(pedidoId: string): string {
+  return `${getWSSBase()}/chat/${pedidoId}/ws`
+}
+
+export function getCallWebSocketUrl(pedidoId: string): string {
+  return `${getWSSBase()}/chat/${pedidoId}/call/ws`
 }
 
 export const authApi = {
@@ -184,24 +282,6 @@ export const authApi = {
   updateMe: async (data: Partial<UserOut>) => {
     const res = await api.put('/auth/me', data)
     return res.data as UserOut
-  },
-  // OTP
-  enviarOTP: async (telefone: string) => {
-    const res = await api.post('/auth/enviar-otp', { telefone })
-    return res.data
-  },
-  verificarOTP: async (telefone: string, codigo: string) => {
-    const res = await api.post('/auth/verificar-otp', { telefone, codigo })
-    return res.data
-  },
-  // Email
-  enviarEmailVerificacao: async () => {
-    const res = await api.post('/auth/enviar-email-verificacao')
-    return res.data
-  },
-  verificarEmail: async (token: string) => {
-    const res = await api.post('/auth/verificar-email', { token })
-    return res.data
   },
   // Password
   esqueciPassword: async (email: string) => {
@@ -237,6 +317,22 @@ export const pedidosApi = {
     const res = await api.put(`/pedidos/${id}`, data)
     return res.data as PedidoOut
   },
+  atualizarStatus: async (id: string, status: string) => {
+    const res = await api.patch(`/pedidos/${id}/status`, { status })
+    return res.data as PedidoOut
+  },
+  tracking: async (id: string) => {
+    const res = await api.get(`/pedidos/${id}/tracking`)
+    return res.data as TrackingOut
+  },
+  uploadFoto: async (id: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post(`/pedidos/${id}/fotos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
   eliminar: async (id: string) => {
     await api.delete(`/pedidos/${id}`)
   },
@@ -255,6 +351,50 @@ export const pedidosApi = {
   cancelar: async (id: string) => {
     const res = await api.post(`/pedidos/${id}/cancelar`)
     return res.data as PedidoOut
+  },
+  enviarOrcamento: async (
+    id: string,
+    data: { total: number; itens?: { descricao: string; valor: number }[]; nota?: string }
+  ) => {
+    const res = await api.post(`/pedidos/${id}/orcamento`, data)
+    return res.data as PedidoOut
+  },
+  aprovarOrcamento: async (id: string) => {
+    const res = await api.post(`/pedidos/${id}/orcamento/aprovar`)
+    return res.data as PedidoOut
+  },
+  rejeitarOrcamento: async (id: string) => {
+    const res = await api.post(`/pedidos/${id}/orcamento/rejeitar`)
+    return res.data as PedidoOut
+  },
+}
+
+export const profissionaisApi = {
+  pesquisar: async (params?: {
+    q?: string
+    categoria?: string
+    tipo?: string
+    disponivel?: boolean
+    min_avaliacao?: number
+    lat?: number
+    lon?: number
+    raio?: number
+    limit?: number
+  }) => {
+    const res = await api.get('/profissionais', { params })
+    return res.data as ProfissionalOut[]
+  },
+  obter: async (id: string, lat?: number, lon?: number) => {
+    const res = await api.get(`/profissionais/${id}`, { params: { lat, lon } })
+    return res.data as ProfissionalOut
+  },
+  avaliacoes: async (id: string, limit = 10) => {
+    const res = await api.get(`/profissionais/${id}/avaliacoes`, { params: { limit } })
+    return res.data as AvaliacaoProfissional[]
+  },
+  atualizarEstado: async (estado: 'online' | 'offline' | 'ocupado') => {
+    const res = await api.post('/profissionais/estado', { estado })
+    return res.data as ProfissionalOut
   },
 }
 
@@ -285,28 +425,6 @@ export const pagamentosApi = {
   libertar: async (pedidoId: string) => {
     const res = await api.post(`/pagamentos/${pedidoId}/libertar`)
     return res.data as PagamentoOut
-  },
-}
-
-export const documentosApi = {
-  listar: async () => {
-    const res = await api.get('/documentos')
-    return res.data as DocumentoOut[]
-  },
-  statusVerificacao: async () => {
-    const res = await api.get('/documentos/status-verificacao')
-    return res.data as StatusVerificacao
-  },
-  upload: async (tipo: string, file: File) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await api.post(`/documentos/${tipo}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return res.data as DocumentoOut
-  },
-  eliminar: async (id: string) => {
-    await api.delete(`/documentos/${id}`)
   },
 }
 

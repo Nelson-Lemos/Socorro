@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Send, Circle, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Send, Circle, MessageCircle, Phone } from 'lucide-react'
 import { api, getWebSocketUrl } from '../api'
 import { useAuth } from '../context/AuthContext'
+import VoiceCall from '../components/VoiceCall'
+import type { VoiceCallHandle, CallParticipant } from '../components/VoiceCall'
 
 interface Mensagem {
   id: string
@@ -20,7 +22,9 @@ interface Pedido {
   id: string
   titulo: string
   criador_nome: string | null
+  criador_foto: string | null
   prestador_nome: string | null
+  prestador_foto: string | null
   criado_por_id: string
   prestador_id: string | null
 }
@@ -37,6 +41,7 @@ export default function ChatPage() {
   const wsRef = useRef<WebSocket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const callRef = useRef<VoiceCallHandle>(null)
 
   useEffect(() => {
     if (!id) return
@@ -83,7 +88,8 @@ export default function ChatPage() {
     if (!novoTexto.trim() || !id || enviando) return
     setEnviando(true)
     try {
-      await api.post(`/chat/${id}/mensagens`, { conteudo: novoTexto.trim(), tipo: 'texto' })
+      const res = await api.post(`/chat/${id}/mensagens`, { conteudo: novoTexto.trim(), tipo: 'texto' })
+      setMensagens(prev => prev.some(m => m.id === res.data.id) ? prev : [...prev, res.data])
       setNovoTexto('')
       inputRef.current?.focus()
     } catch { /* empty */ }
@@ -111,6 +117,12 @@ export default function ChatPage() {
     ? (pedido.prestador_nome || 'Prestador')
     : (pedido.criador_nome || 'Criador')
 
+  const isCriador = user?.id === pedido.criado_por_id
+  const peer: CallParticipant = isCriador
+    ? { id: pedido.prestador_id || '', nome: pedido.prestador_nome || 'Prestador', foto_perfil: pedido.prestador_foto }
+    : { id: pedido.criado_por_id, nome: pedido.criador_nome || 'Criador', foto_perfil: pedido.criador_foto }
+  const canCall = !!user && !!token && !!peer.id && peer.id !== user.id
+
   return (
     <div className="h-screen bg-surface-50 dark:bg-surface-950 flex flex-col">
       {/* Header */}
@@ -126,6 +138,15 @@ export default function ChatPage() {
               <span className="text-[11px] text-surface-500 dark:text-surface-400">Conversa com {outroNome}</span>
             </div>
           </div>
+          {canCall && (
+            <button
+              onClick={() => callRef.current?.startCall()}
+              className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white shadow-md shadow-brand-600/25 transition-all active:scale-95"
+              aria-label={`Chamar ${peer.nome}`}
+            >
+              <Phone size={18} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -190,6 +211,16 @@ export default function ChatPage() {
           </button>
         </div>
       </div>
+
+      {user && token && (
+        <VoiceCall
+          ref={callRef}
+          pedidoId={id!}
+          token={token}
+          self={{ id: user.id, nome: user.nome, foto_perfil: user.foto_perfil }}
+          peer={peer}
+        />
+      )}
     </div>
   )
 }

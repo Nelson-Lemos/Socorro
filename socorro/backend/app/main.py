@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
-from app.routes import auth, pedidos, documentos, chat, pagamentos, avaliacoes
+from app.routes import auth, pedidos, chat, pagamentos, avaliacoes, profissionais
 import os
 
 settings = get_settings()
@@ -30,10 +30,10 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 # Routes
 app.include_router(auth.router)
 app.include_router(pedidos.router)
-app.include_router(documentos.router)
 app.include_router(chat.router)
 app.include_router(pagamentos.router)
 app.include_router(avaliacoes.router)
+app.include_router(profissionais.router)
 
 
 @app.get("/health")

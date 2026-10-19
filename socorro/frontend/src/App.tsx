@@ -9,7 +9,11 @@ import PedidoDetail from './pages/PedidoDetail'
 import ChatPage from './pages/ChatPage'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import Documents from './pages/Documents'
+import Procurar from './pages/Procurar'
+import Mapa from './pages/Mapa'
+import PerfilProfissional from './pages/PerfilProfissional'
+import PerfilConta from './pages/PerfilConta'
+import Pedidos from './pages/Pedidos'
 
 function PrivateRoute({ children }: { children: any }) {
   const { user, loading } = useAuth()
@@ -40,12 +44,15 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/esqueci-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/redefinir-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
-      <Route path="/verificar-email" element={<PublicRoute><ResetPassword /></PublicRoute>} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/pedir-socorro" element={<PrivateRoute><PedirSocorro /></PrivateRoute>} />
+      <Route path="/procurar" element={<PrivateRoute><Procurar /></PrivateRoute>} />
+      <Route path="/mapa" element={<PrivateRoute><Mapa /></PrivateRoute>} />
+      <Route path="/pedidos" element={<PrivateRoute><Pedidos /></PrivateRoute>} />
+      <Route path="/perfil" element={<PrivateRoute><PerfilConta /></PrivateRoute>} />
+      <Route path="/profissional/:id" element={<PrivateRoute><PerfilProfissional /></PrivateRoute>} />
       <Route path="/pedido/:id" element={<PrivateRoute><PedidoDetail /></PrivateRoute>} />
       <Route path="/chat/:id" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
-      <Route path="/documentos" element={<PrivateRoute><Documents /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

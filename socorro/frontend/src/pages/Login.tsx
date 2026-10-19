@@ -43,7 +43,7 @@ export default function Login() {
   return (
     <div className="auth-page">
       {/* ─── Left branded panel ──────────────────────────────── */}
-      <div className="auth-visual" style={{ background: 'linear-gradient(135deg, #DC2626, #B91C1C, #991B1B)' }}>
+      <div className="auth-visual" style={{ background: '#B91C1C' }}>
         <div className="auth-visual-pattern" />
 
         {/* Image collage */}
@@ -88,35 +88,13 @@ export default function Login() {
           >
             Conectando você aos melhores profissionais de confiança em Angola.
           </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.6 }}
-            style={{ marginTop: 40, display: 'flex', gap: 24, color: '#FECACA', fontSize: 14 }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#FFF' }}>10k+</span>
-              <span>Profissionais</span>
-            </div>
-            <div style={{ width: 1, background: 'rgba(248,113,113,0.4)' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#FFF' }}>50k+</span>
-              <span>Serviços</span>
-            </div>
-            <div style={{ width: 1, background: 'rgba(248,113,113,0.4)' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#FFF' }}>4.9</span>
-              <span>Avaliação</span>
-            </div>
-          </motion.div>
         </div>
       </div>
 
       {/* ─── Right form panel ────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Mobile header */}
-        <div style={{ padding: '32px 16px', textAlign: 'center', background: 'linear-gradient(135deg, #DC2626, #B91C1C)' }} className="lg:!hidden">
+        <div style={{ padding: '32px 16px', textAlign: 'center', background: '#B91C1C' }} className="lg:!hidden">
           <img src={logoUrl} alt="Socorro!" style={{ height: 56, width: 56, margin: '0 auto 12px', borderRadius: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }} />
           <h1 style={{ fontSize: 30, fontWeight: 800, color: '#FFF' }}>
             Socorro<span style={{ color: '#FDE047' }}>!</span>

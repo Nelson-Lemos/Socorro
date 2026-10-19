@@ -8,14 +8,11 @@ from app.database import get_db
 from app.models import User
 from app.schemas import (
     UserCreate, UserOut, Token, UserUpdate,
-    OTPRequest, OTPVerify, EmailVerify, PasswordResetRequest, PasswordReset,
+    PasswordResetRequest, PasswordReset,
 )
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.services import (
-    generate_otp, store_otp, verify_otp,
-    store_email_token, verify_email_token,
     store_password_reset, verify_password_reset,
-    send_sms_otp, send_verification_email,
 )
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
@@ -48,15 +45,45 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         competencias=user_data.competencias,
         nif=user_data.nif,
         area_atuacao=user_data.area_atuacao,
+        especialidades=user_data.especialidades,
+        anos_experiencia=user_data.anos_experiencia,
+        descricao=user_data.descricao,
+        disponibilidade=user_data.disponibilidade,
+        raio_atuacao=user_data.raio_atuacao,
+        # Empresa — identidade comercial
+        nome_comercial=user_data.nome_comercial,
+        tipo_entidade=user_data.tipo_entidade,
+        logo=user_data.logo,
+        foto_capa=user_data.foto_capa,
+        telefone_whatsapp=user_data.telefone_whatsapp,
+        website=user_data.website,
+        redes_sociais=user_data.redes_sociais,
+        # Localização desagregada
+        provincia=user_data.provincia,
+        municipio=user_data.municipio,
+        bairro=user_data.bairro,
+        endereco=user_data.endereco,
+        ponto_referencia=user_data.ponto_referencia,
+        # Serviços e área de atendimento
+        categorias_servico=user_data.categorias_servico,
+        atende_estabelecimento=user_data.atende_estabelecimento,
+        atende_domicilio=user_data.atende_domicilio,
+        areas_atendidas=user_data.areas_atendidas,
+        horario_atendimento=user_data.horario_atendimento,
+        atendimento_24h=user_data.atendimento_24h,
+        # Verificação / representante
+        representante_nome=user_data.representante_nome,
+        representante_cargo=user_data.representante_cargo,
+        representante_telefone=user_data.representante_telefone,
+        certidao_comercial_url=user_data.certidao_comercial_url,
+        doc_representante_url=user_data.doc_representante_url,
+        licenca_url=user_data.licenca_url,
+        status_verificacao=user_data.status_verificacao,
+        status_atendimento="online" if user_data.tipo_conta == "empresa" else "offline",
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
-
-    # Send email verification
-    email_token = uuid.uuid4().hex
-    await store_email_token(str(user.id), email_token)
-    await send_verification_email(user.email, email_token)
 
     token = create_access_token(data={"sub": str(user.id)})
     return Token(
@@ -106,69 +133,6 @@ async def update_me(
     await db.commit()
     await db.refresh(current_user)
     return UserOut.model_validate(current_user)
-
-
-# --- OTP / Phone Verification ---
-@router.post("/enviar-otp")
-async def enviar_otp(data: OTPRequest, db: AsyncSession = Depends(get_db)):
-    # Check if phone exists in system
-    result = await db.execute(select(User).where(User.telefone == data.telefone))
-    user = result.scalar_one_or_none()
-
-    otp = generate_otp()
-    await store_otp(data.telefone, otp)
-    sent = await send_sms_otp(data.telefone, otp)
-
-    if not sent:
-        raise HTTPException(status_code=500, detail="Erro ao enviar SMS")
-
-    return {"message": "Código de verificação enviado", "telefone": data.telefone}
-
-
-@router.post("/verificar-otp")
-async def verificar_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
-    valid = await verify_otp(data.telefone, data.codigo)
-    if not valid:
-        raise HTTPException(status_code=400, detail="Código inválido ou expirado")
-
-    # Update user phone verification status
-    result = await db.execute(select(User).where(User.telefone == data.telefone))
-    user = result.scalar_one_or_none()
-    if user:
-        user.telefone_verificado = True
-        await db.commit()
-
-    return {"message": "Telefone verificado com sucesso"}
-
-
-# --- Email Verification ---
-@router.post("/enviar-email-verificacao")
-async def enviar_email_verificacao(
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.email_verificado:
-        return {"message": "Email já verificado"}
-
-    email_token = uuid.uuid4().hex
-    await store_email_token(str(current_user.id), email_token)
-    await send_verification_email(current_user.email, email_token)
-
-    return {"message": "Email de verificação enviado"}
-
-
-@router.post("/verificar-email")
-async def verificar_email(data: EmailVerify, db: AsyncSession = Depends(get_db)):
-    user_id = await verify_email_token(data.token)
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Token inválido ou expirado")
-
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if user:
-        user.email_verificado = True
-        await db.commit()
-
-    return {"message": "Email verificado com sucesso"}
 
 
 # --- Password Reset ---

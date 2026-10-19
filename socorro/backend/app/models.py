@@ -22,9 +22,18 @@ class Genero(str, enum.Enum):
 
 class StatusPedido(str, enum.Enum):
     ABERTO = "aberto"
+    PROCURANDO = "procurando"
+    A_CAMINHO = "a_caminho"
+    CHEGOU = "chegou"
     EM_ANDAMENTO = "em_andamento"
     CONCLUIDO = "concluido"
     CANCELADO = "cancelado"
+
+
+class StatusAtendimento(str, enum.Enum):
+    ONLINE = "online"
+    OFFLINE = "offline"
+    OCUPADO = "ocupado"
 
 
 class Urgencia(str, enum.Enum):
@@ -38,12 +47,6 @@ class StatusPagamento(str, enum.Enum):
     RETIDO = "retido"
     LIBERTADO = "libertado"
     REEMBOLSADO = "reembolsado"
-
-
-class StatusVerificacao(str, enum.Enum):
-    PENDENTE = "pendente"
-    APROVADO = "aprovado"
-    REJEITADO = "rejeitado"
 
 
 class User(Base):
@@ -67,17 +70,54 @@ class User(Base):
     # Empresa fields
     nif = Column(String(20), nullable=True)
     area_atuacao = Column(String(100), nullable=True)
+    nome_comercial = Column(String(255), nullable=True)   # Nome comercial (se diferente do nome legal)
+    tipo_entidade = Column(String(50), nullable=True)     # empresa | eni | oficina | prestador
+    logo = Column(String(500), nullable=True)             # URL do logotipo
+    foto_capa = Column(String(500), nullable=True)        # URL da fotografia/capa (opcional)
+
+    # Contactos
+    telefone_whatsapp = Column(String(20), nullable=True)
+    website = Column(String(255), nullable=True)
+    redes_sociais = Column(Text, nullable=True)           # JSON string: {"facebook": "...", "instagram": "..."}
+
+    # Localização desagregada
+    provincia = Column(String(100), nullable=True)
+    municipio = Column(String(100), nullable=True)
+    bairro = Column(String(100), nullable=True)
+    endereco = Column(String(255), nullable=True)
+    ponto_referencia = Column(String(255), nullable=True)
+
+    # Serviços e área de atendimento
+    categorias_servico = Column(Text, nullable=True)      # lista separada por vírgula (categorias/serviços)
+    atende_estabelecimento = Column(Boolean, default=False)  # atende no estabelecimento?
+    atende_domicilio = Column(Boolean, default=False)     # atende ao domicílio?
+    areas_atendidas = Column(Text, nullable=True)         # lista separada por vírgula (municípios/bairros)
+    horario_atendimento = Column(JSON, nullable=True)     # {"segunda": {"abre": "08:00", "fecha": "18:00"}, ...} / {"24h": true}
+    atendimento_24h = Column(Boolean, default=False)
+
+    # Verificação / representante
+    representante_nome = Column(String(255), nullable=True)
+    representante_cargo = Column(String(100), nullable=True)
+    representante_telefone = Column(String(20), nullable=True)
+    certidao_comercial_url = Column(String(500), nullable=True)   # documento de verificação
+    doc_representante_url = Column(String(500), nullable=True)    # documento de identificação do representante
+    licenca_url = Column(String(500), nullable=True)              # licença (quando aplicável)
+    status_verificacao = Column(String(20), default="nao_submetida")  # nao_submetida | em_analise | verificada | rejeitada
 
     # Profile
     foto_perfil = Column(String(500), nullable=True)
     descricao = Column(Text, nullable=True)
     disponibilidade = Column(String(100), nullable=True)
     raio_atuacao = Column(Integer, default=10)
+    especialidades = Column(Text, nullable=True)
+    anos_experiencia = Column(Integer, nullable=True)
+    status_atendimento = Column(String(20), nullable=True, default=StatusAtendimento.ONLINE)
 
     # Verification
     verificado = Column(Boolean, default=False)
     email_verificado = Column(Boolean, default=False)
     telefone_verificado = Column(Boolean, default=False)
+    doc_comercial_url = Column(String(500), nullable=True)   # certidão comercial / documento de registro
 
     # Status
     ativo = Column(Boolean, default=True)
@@ -85,28 +125,10 @@ class User(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    documentos = relationship("Documento", back_populates="user", cascade="all, delete-orphan")
     pedidos_criados = relationship("Pedido", back_populates="criador", foreign_keys="Pedido.criado_por_id")
     pedidos_aceitos = relationship("Pedido", back_populates="prestador", foreign_keys="Pedido.prestador_id")
     avaliacoes_recebidas = relationship("Avaliacao", back_populates="avaliado", foreign_keys="Avaliacao.avaliado_id")
     avaliacoes_feitas = relationship("Avaliacao", back_populates="avaliador", foreign_keys="Avaliacao.avaliador_id")
-
-
-class Documento(Base):
-    __tablename__ = "documentos"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    tipo = Column(String(50), nullable=False)  # bi_frente, bi_verso, alvara, certidao, nif, selfie, comprovativo_residencia, etc.
-    nome_ficheiro = Column(String(255), nullable=False)
-    caminho = Column(String(500), nullable=False)
-    status = Column(String(20), default=StatusVerificacao.PENDENTE)
-    verificado_por = Column(UUID(as_uuid=True), nullable=True)
-    verificado_em = Column(DateTime, nullable=True)
-    motivo_rejeicao = Column(Text, nullable=True)
-    criado_em = Column(DateTime, default=datetime.utcnow)
-
-    user = relationship("User", back_populates="documentos")
 
 
 class Pedido(Base):
@@ -117,6 +139,7 @@ class Pedido(Base):
     categoria = Column(String(100), nullable=False)
     descricao = Column(Text, nullable=False)
     localizacao = Column(String(500), nullable=False)
+    referencia = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     urgencia = Column(String(20), nullable=False, default=Urgencia.MODERADA)
@@ -130,6 +153,13 @@ class Pedido(Base):
     # Valor
     valor = Column(Float, nullable=True)
     valor_acordado = Column(Float, nullable=True)
+
+    # Orçamento (diagnóstico -> orçamento -> aprovação)
+    orcamento_itens = Column(JSON, nullable=True)  # [{"descricao": "...", "valor": 15000}]
+    orcamento_status = Column(String(20), nullable=False, default="nao_enviado")  # nao_enviado | enviado | aprovado | rejeitado
+    orcamento_nota = Column(Text, nullable=True)
+    orcamento_enviado_em = Column(DateTime, nullable=True)
+    orcamento_aprovado_em = Column(DateTime, nullable=True)
 
     criado_em = Column(DateTime, default=datetime.utcnow)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
