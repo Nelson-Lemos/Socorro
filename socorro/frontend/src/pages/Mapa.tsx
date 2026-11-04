@@ -294,8 +294,9 @@ export default function Mapa() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-surface-900 dark:text-white truncate">{selected.nome}</p>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: '#10B981' }}>
-                        {selected.status_atendimento === 'online' ? '● Disponível' : selected.status_atendimento === 'ocupado' ? '● Ocupado' : '● Offline'}
+                      <span className="flex items-center gap-1 text-[11px] font-semibold shrink-0" style={{ color: STATUS_ATENDIMENTO[selected.status_atendimento || 'offline'].dot }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_ATENDIMENTO[selected.status_atendimento || 'offline'].dot }} />
+                        {STATUS_ATENDIMENTO[selected.status_atendimento || 'offline'].label}
                       </span>
                     </div>
                     <p className="text-sm text-surface-500 capitalize">{selected.area_atuacao || 'Profissional'}</p>

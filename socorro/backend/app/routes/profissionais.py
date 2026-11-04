@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from math import asin, cos, radians, sin, sqrt
+from difflib import SequenceMatcher
+import unicodedata
 from app.database import get_db
 from app.models import User, Avaliacao
 from app.schemas import ProfissionalOut, EstadoAtendimentoUpdate
@@ -42,6 +44,104 @@ def canonizar(texto: str) -> str:
     return _CANONICA.get(texto.strip().lower(), texto.strip().lower())
 
 
+def _normalizar(texto: str) -> str:
+    """Minúsculas, sem acentos e sem pontuação — base para comparação difusa."""
+    if not texto:
+        return ""
+    texto = unicodedata.normalize("NFKD", texto.lower())
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    return "".join(c if c.isalnum() or c.isspace() else " " for c in texto).strip()
+
+
+def _tokens(texto: str) -> List[str]:
+    return [t for t in _normalizar(texto).split() if len(t) >= 2]
+
+
+def _similaridade(a: str, b: str) -> float:
+    """Rácio de semelhança entre duas cadeias (0..1), já normalizadas."""
+    a, b = _normalizar(a), _normalizar(b)
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    if a in b or b in a:
+        return 0.92
+    ratio = SequenceMatcher(None, a, b).ratio()
+    # Semelhança por token: "eletricista" vs "eletrecidade" -> tokens próximos
+    toks_a, toks_b = set(a.split()), set(b.split())
+    if toks_a and toks_b:
+        inter = toks_a & toks_b
+        if inter:
+            ratio = max(ratio, 0.85 + 0.15 * (len(inter) / max(len(toks_a), len(toks_b))))
+        else:
+            melhor = max(
+                (SequenceMatcher(None, ta, tb).ratio() for ta in toks_a for tb in toks_b),
+                default=0.0,
+            )
+            ratio = max(ratio, melhor * 0.9)
+    return ratio
+
+
+def _expandir_termo(termo: str) -> List[str]:
+    """Devolve o termo e sinónimos canónicos relacionados (tolerante a erros)."""
+    norm = _normalizar(termo)
+    if not norm:
+        return []
+    variantes = {norm}
+    for item, canon in _CANONICA.items():
+        item_n = _normalizar(item)
+        if item_n == norm:
+            variantes.add(_normalizar(canon))
+            variantes.update(_normalizar(v) for v in SINONIMOS.get(canon, []))
+        elif _similaridade(item_n, norm) >= 0.82:
+            # erro de escrita: "eletrecista" ~ "eletricista"
+            variantes.add(item_n)
+            variantes.add(_normalizar(canon))
+    return [v for v in variantes if v]
+
+
+def _pontuar_utilizador(user: User, termo: str, variantes: List[str]) -> float:
+    """Pontuação de proximidade do utilizador com o termo pesquisado (0..~1+)."""
+    norm_termo = _normalizar(termo)
+    if not norm_termo:
+        return 0.0
+
+    campos = [
+        (user.nome, 1.0),
+        (user.nome_comercial, 1.0),
+        (user.area_atuacao, 0.95),
+        (user.categorias_servico, 0.85),
+        (user.especialidades, 0.8),
+        (user.competencias, 0.75),
+        (user.descricao, 0.45),
+        (user.bairro, 0.4),
+        (user.municipio, 0.4),
+        (user.localizacao, 0.35),
+    ]
+
+    melhor = 0.0
+    for valor, peso in campos:
+        if not valor:
+            continue
+        norm_valor = _normalizar(valor)
+        if not norm_valor:
+            continue
+        # Correspondência direta
+        if norm_termo in norm_valor:
+            melhor = max(melhor, peso)
+            continue
+        # Correspondência com variantes/sinónimos
+        if any(v in norm_valor for v in variantes):
+            melhor = max(melhor, peso * 0.9)
+            continue
+        # Proximidade difusa nos tokens
+        for token in _tokens(valor):
+            if _similaridade(token, norm_termo) >= 0.72:
+                melhor = max(melhor, peso * 0.75)
+                break
+    return melhor
+
+
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     dlat = radians(lat2 - lat1)
@@ -65,7 +165,7 @@ async def _avaliacoes_map(db: AsyncSession, user_ids: List[str]) -> dict:
     return {str(r[0]): (float(r[1]), int(r[2])) for r in result.all()}
 
 
-def _out(user: User, rating, dist: Optional[float]) -> ProfissionalOut:
+def _out(user: User, rating, dist: Optional[float], match_score: Optional[float] = None) -> ProfissionalOut:
     media, total = (None, 0) if rating is None else rating
     # A categoria que aparece na pesquisa: para empresas, usa as categorias de serviço
     area = user.area_atuacao or (user.categorias_servico or "").split(",")[0].strip() or None
@@ -100,6 +200,7 @@ def _out(user: User, rating, dist: Optional[float]) -> ProfissionalOut:
         dist_km=round(dist, 1) if dist is not None else None,
         avaliacao_media=round(media, 1) if media is not None else None,
         total_avaliacoes=total,
+        match_score=round(match_score, 3) if match_score is not None else None,
     )
 
 
@@ -147,27 +248,60 @@ async def pesquisar_profissionais(
             )
         )
 
+    # Guarda a query sem filtro de texto, para fallback em caso de erro de escrita
+    query_sem_texto = query
+
     if q and q.strip():
-        termo = q.strip().lower()
-        query = query.where(
-            or_(
-                User.nome.ilike(f"%{termo}%"),
-                User.nome_comercial.ilike(f"%{termo}%"),
-                User.area_atuacao.ilike(f"%{termo}%"),
-                User.categorias_servico.ilike(f"%{termo}%"),
-                User.competencias.ilike(f"%{termo}%"),
-                User.especialidades.ilike(f"%{termo}%"),
-                User.localizacao.ilike(f"%{termo}%"),
-            )
-        )
+        termo = _normalizar(q)
+        bruto = q.strip().lower()
+        # Filtro SQL amplo — inclui a forma acentuada (como está na BD) e a
+        # normalizada, além dos sinónimos. O ranking difuso é feito em Python,
+        # para que erros de escrita como "eletrecista" encontrem "eletricista".
+        termos_sql = {termo, bruto}
+        for v in _expandir_termo(q)[:8]:
+            termos_sql.add(v)
+        # Sinónimos canónicos na forma original (acentuada) — "canalização"
+        for canon in {canonizar(q), canonizar(termo)}:
+            if canon:
+                termos_sql.add(canon.lower())
+                for s in SINONIMOS.get(canon, []):
+                    termos_sql.add(s.lower())
+        # Tokens individuais ajudam em nomes compostos ("canaliza luanda")
+        for tok in _tokens(q):
+            if len(tok) >= 4:
+                termos_sql.add(tok)
+
+        condicoes = []
+        for t in termos_sql:
+            condicoes.extend([
+                User.nome.ilike(f"%{t}%"),
+                User.nome_comercial.ilike(f"%{t}%"),
+                User.area_atuacao.ilike(f"%{t}%"),
+                User.categorias_servico.ilike(f"%{t}%"),
+                User.competencias.ilike(f"%{t}%"),
+                User.especialidades.ilike(f"%{t}%"),
+                User.localizacao.ilike(f"%{t}%"),
+                User.descricao.ilike(f"%{t}%"),
+            ])
+        query = query.where(or_(*condicoes))
 
     result = await db.execute(query)
     users = result.scalars().all()
 
+    # Fallback tolerante a erros de escrita em nomes: se o filtro estrito não
+    # devolveu nada, procura numa amostra ampla e deixa o ranking difuso decidir.
+    if (q and q.strip()) and not users:
+        ampla = query_sem_texto.order_by(User.criado_em.desc()).limit(max(limit * 6, 120))
+        result = await db.execute(ampla)
+        users = result.scalars().all()
+
     ids = [str(u.id) for u in users]
     ratings = await _avaliacoes_map(db, ids)
 
-    profissionais = []
+    variantes = _expandir_termo(q) if q and q.strip() else []
+    tem_termo = bool(q and q.strip())
+
+    profissionais: List[Tuple[User, float, int, Optional[float], float]] = []
     for u in users:
         dist = None
         if lat is not None and lon is not None and u.latitude is not None and u.longitude is not None:
@@ -188,12 +322,17 @@ async def pesquisar_profissionais(
             if media is None or media < min_avaliacao:
                 continue
 
-        profissionais.append((u, media, total, dist))
+        score = _pontuar_utilizador(u, q, variantes) if tem_termo else 0.0
+        # Com termo de pesquisa, descarta resultados sem qualquer proximidade real
+        if tem_termo and score < 0.30:
+            continue
 
-    # Ordenação: compatibilidade, disponibilidade, distância, reputação
+        profissionais.append((u, media, total, dist, score))
+
+    # Ordenação: proximidade ao termo, categoria, disponibilidade, distância, reputação
     def chave(item):
-        u, media, total, dist = item
-        s = 0.0
+        u, media, total, dist, score = item
+        s = score * 100  # peso dominante para a semelhança do termo
         if categoria:
             canon = canonizar(categoria)
             if canonizar(u.area_atuacao) == canon:
@@ -210,7 +349,10 @@ async def pesquisar_profissionais(
         return -s
 
     profissionais.sort(key=chave)
-    return [_out(u, ratings.get(str(u.id)), d) for u, _m, _t, d in profissionais][skip : skip + limit]
+    return [
+        _out(u, ratings.get(str(u.id)), d, score)
+        for u, _m, _t, d, score in profissionais
+    ][skip : skip + limit]
 
 
 @router.get("/{user_id}", response_model=ProfissionalOut)

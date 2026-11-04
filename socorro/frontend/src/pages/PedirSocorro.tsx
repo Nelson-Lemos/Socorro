@@ -10,6 +10,7 @@ import { pedidosApi, profissionaisApi } from '../api'
 import type { PedidoOut, ProfissionalOut } from '../api'
 import {
   CATEGORIAS_PRINCIPAIS, OUTRAS_CATEGORIAS, TODAS_CATEGORIAS, categoriaInfo, STATUS_ATENDIMENTO,
+  pontuarCorrespondencia,
 } from '../constants'
 import { getCurrentPosition, saveLocation, readSavedLocation, LUANDA, type Coords, formatDist } from '../utils/geo'
 import toast from 'react-hot-toast'
@@ -252,9 +253,19 @@ export default function PedirSocorro() {
   const cat = categoriaInfo(categoria)
   const CatIcon = cat.icon
   const servicosDaCategoria = SUB_SERVICOS[categoria] || OUTROS_SERVICOS
-  const catBusca = busca.trim().toLowerCase()
+  const catBusca = busca.trim()
   const resultadosBusca = catBusca
-    ? TODAS_CATEGORIAS.filter((c) => c.label.toLowerCase().includes(catBusca))
+    ? TODAS_CATEGORIAS
+        .map((c) => ({
+          cat: c,
+          score: Math.max(
+            pontuarCorrespondencia(c.label, catBusca),
+            ...c.keywords.map((k) => pontuarCorrespondencia(k, catBusca)),
+          ),
+        }))
+        .filter((r) => r.score >= 0.7)
+        .sort((a, b) => b.score - a.score)
+        .map((r) => r.cat)
     : []
 
   return (

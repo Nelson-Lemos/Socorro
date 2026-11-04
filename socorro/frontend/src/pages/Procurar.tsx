@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
-  Search, SlidersHorizontal, Map as MapIcon, List, Building2, User, Loader2, RefreshCw, AlertCircle, X,
+  Search, SlidersHorizontal, Map as MapIcon, List, Building2, User, Loader2, RefreshCw, AlertCircle, X, Sparkles,
 } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
 import ProfessionalCard from '../components/ProfessionalCard'
 import LeafletMap from '../components/LeafletMap'
 import { profissionaisApi } from '../api'
 import type { ProfissionalOut } from '../api'
-import { TODAS_CATEGORIAS } from '../constants'
+import { TODAS_CATEGORIAS, categoriasCorrespondentes, pontuarCorrespondencia, normalizarTexto } from '../constants'
 import { getCurrentPosition, readSavedLocation, type Coords, LUANDA } from '../utils/geo'
 import EmptyState from '../components/EmptyState'
 import { SkeletonList } from '../components/LoadingSkeleton'
@@ -39,6 +39,7 @@ export default function Procurar() {
   const [centerKey, setCenterKey] = useState(0)
   const [debounce, setDebounce] = useState<ReturnType<typeof setTimeout> | null>(null)
   const mapSearched = useRef(false)
+  const firstLoad = useRef(true)
 
   const buscar = async (opts?: { c?: Coords; rec?: number | null }) => {
     setLoading(true)
@@ -67,7 +68,8 @@ export default function Procurar() {
 
   const reload = () => {
     if (debounce) clearTimeout(debounce)
-    setDebounce(setTimeout(() => buscar(), 350))
+    setDebounce(setTimeout(() => buscar(), firstLoad.current ? 0 : 280))
+    firstLoad.current = false
   }
 
   useEffect(() => {
@@ -94,6 +96,36 @@ export default function Procurar() {
     }
   }
 
+  /* ── Ranking difuso instantâneo (resposta imediata, sem esperar a rede) ── */
+  const ordenados = useMemo(() => {
+    const termo = q.trim()
+    if (!termo) return resultados
+    const cats = categoriasCorrespondentes(termo, 0.78)
+    const catLabels = cats.map((c) => normalizarTexto(c.label))
+    const chave = (p: ProfissionalOut) => {
+      const campos = [p.nome, p.nome_comercial, p.area_atuacao, p.categorias_servico, p.especialidades, p.competencias, p.bairro, p.municipio, p.localizacao]
+      let s = 0
+      for (const campo of campos) {
+        if (!campo) continue
+        s = Math.max(s, pontuarCorrespondencia(campo, termo))
+      }
+      // Áreas/categorias próximas contam como "relacionado"
+      const areaNorm = normalizarTexto(p.area_atuacao || '')
+      if (catLabels.some((l) => l && areaNorm.includes(l))) s = Math.max(s, 0.6)
+      if ((p.status_atendimento || 'offline') === 'online') s += 0.06
+      if (p.verificado) s += 0.03
+      return s
+    }
+    return [...resultados].sort((a, b) => chave(b) - chave(a))
+  }, [resultados, q])
+
+  /* ── Sugestões de área/categoria para o termo ── */
+  const sugestoes = useMemo(() => {
+    const termo = q.trim()
+    if (termo.length < 2) return []
+    return categoriasCorrespondentes(termo, 0.8).slice(0, 4)
+  }, [q])
+
   const markers = useMemo(
     () =>
       resultados
@@ -114,19 +146,44 @@ export default function Procurar() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
-        {/* Search input */}
-        <div className="relative">
-          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Procurar por nome ou serviço (ex.: Eletricista, Ngola Motors...)"
-            className="w-full pl-12 pr-10 py-3.5 rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 text-surface-900 dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-          />
-          {q && (
-            <button onClick={() => setQ('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400">
-              <X size={18} />
-            </button>
+        {/* Search input — sempre visível no topo */}
+        <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1 pb-3 bg-surface-50/90 dark:bg-surface-950/90 backdrop-blur-xl">
+          <div className="relative">
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-surface-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Procurar por nome ou serviço (ex.: Eletricista, Ngola Motors...)"
+              className="w-full pl-12 pr-10 py-3.5 rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 text-surface-900 dark:text-white outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+            />
+            {q ? (
+              <button onClick={() => setQ('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400" aria-label="Limpar">
+                <X size={18} />
+              </button>
+            ) : (
+              loading && <Loader2 size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 animate-spin" />
+            )}
+          </div>
+
+          {/* Sugestões de áreas relacionadas — aparecem logo, instantâneas */}
+          {sugestoes.length > 0 && (
+            <div className="flex items-center gap-2 mt-2.5 overflow-x-auto scrollbar-none">
+              <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-surface-400 shrink-0">
+                <Sparkles size={12} /> Perto deste termo
+              </span>
+              {sugestoes.map((c) => {
+                const active = categoria === c.label
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => { setCategoria(active ? '' : c.label); setQ('') }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${active ? 'bg-brand-600 text-white' : 'bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 text-surface-600 dark:text-surface-300'}`}
+                  >
+                    {c.label}
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
 
@@ -247,8 +304,8 @@ export default function Procurar() {
         )}
 
         {/* Results */}
-        <div className={view === 'mapa' ? 'space-y-3' : 'space-y-3'}>
-          {loading ? (
+        <div className="space-y-3">
+          {loading && resultados.length === 0 ? (
             <SkeletonList count={5} />
           ) : error ? (
             <EmptyState icon={<AlertCircle size={26} />} title="Erro" description={error} />
@@ -258,14 +315,28 @@ export default function Procurar() {
               <p className="text-sm text-surface-500 mt-1">
                 {soDisponivel ? 'Experimente desativar o filtro "Disponíveis agora"' : 'Tente outro termo de pesquisa'}
               </p>
+              {sugestoes.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-2 mt-4">
+                  {sugestoes.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setQ(''); setCategoria(c.label) }}
+                      className="px-3 py-1.5 rounded-full bg-surface-100 dark:bg-surface-800 text-xs font-semibold text-surface-700 dark:text-surface-200"
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <>
               <p className="text-sm text-surface-500">
-                <b className="text-surface-800 dark:text-white">{resultados.length}</b> profissionais encontrados
-                {coords ? <> perto de si</> : ''}
+                <b className="text-surface-800 dark:text-white">{ordenados.length}</b> {ordenados.length === 1 ? 'resultado' : 'resultados'}
+                {q.trim() && <span className="text-surface-400"> · ordenados por semelhança com "{q.trim()}"</span>}
+                {coords ? <> · perto de si</> : ''}
               </p>
-              {resultados.map((p) => (
+              {ordenados.map((p) => (
                 <ProfessionalCard key={p.id} pro={p} />
               ))}
             </>

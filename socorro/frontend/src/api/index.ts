@@ -92,6 +92,28 @@ export interface UserOut {
   verificado: boolean
   telefone_verificado: boolean
   criado_em: string
+  /* Empresa — identidade comercial */
+  nome_comercial?: string
+  tipo_entidade?: string
+  logo?: string
+  foto_capa?: string
+  telefone_whatsapp?: string
+  website?: string
+  redes_sociais?: string
+  provincia?: string
+  municipio?: string
+  bairro?: string
+  endereco?: string
+  ponto_referencia?: string
+  categorias_servico?: string
+  atende_estabelecimento?: boolean
+  atende_domicilio?: boolean
+  areas_atendidas?: string
+  atendimento_24h?: boolean
+  representante_nome?: string
+  representante_cargo?: string
+  representante_telefone?: string
+  status_verificacao?: string
 }
 
 export interface PedidoCreate {
@@ -151,6 +173,45 @@ export interface MensagemOut {
   lida: boolean
   criado_em: string
   remetente_nome?: string
+}
+
+export interface ConversaOut {
+  pedido_id: string
+  titulo: string
+  categoria: string
+  status: string
+  outro_id: string | null
+  outro_nome: string
+  outro_foto: string | null
+  ultima_mensagem: string | null
+  ultima_em: string
+  ultima_de_mim: boolean
+  total_mensagens: number
+}
+
+export interface EventoHistorico {
+  tipo: string
+  pedido_id: string
+  titulo: string
+  categoria: string
+  papel: 'cliente' | 'prestador'
+  em: string
+  detalhe: string
+}
+
+export interface HistoricoOut {
+  resumo: {
+    total_pedidos: number
+    criados: number
+    prestados: number
+    concluidos: number
+    ativos: number
+    cancelados: number
+    gasto_total: number
+    ganho_total: number
+  }
+  pedidos: PedidoOut[]
+  eventos: EventoHistorico[]
 }
 
 export interface PagamentoOut {
@@ -298,6 +359,26 @@ export const authApi = {
     })
     return res.data
   },
+  uploadFotoPerfil: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post('/auth/foto-perfil', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data as { url: string; user: UserOut }
+  },
+}
+
+export const uploadsApi = {
+  /** Upload sem sessão — usado no registo (logótipo / capa) */
+  imagem: async (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post('/upload/imagem', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data as { url: string }
+  },
 }
 
 export const pedidosApi = {
@@ -367,6 +448,10 @@ export const pedidosApi = {
     const res = await api.post(`/pedidos/${id}/orcamento/rejeitar`)
     return res.data as PedidoOut
   },
+  historico: async () => {
+    const res = await api.get('/pedidos/historico')
+    return res.data as HistoricoOut
+  },
 }
 
 export const profissionaisApi = {
@@ -406,6 +491,10 @@ export const chatApi = {
   enviarMensagem: async (pedidoId: string, conteudo: string, tipo = 'texto') => {
     const res = await api.post(`/chat/${pedidoId}/mensagens`, { conteudo, tipo })
     return res.data as MensagemOut
+  },
+  listarConversas: async () => {
+    const res = await api.get('/chat/conversas')
+    return res.data as ConversaOut[]
   },
 }
 

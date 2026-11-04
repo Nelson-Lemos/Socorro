@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, MapPin, Clock, AlertTriangle, User,
-  MessageCircle, CheckCircle, XCircle, Camera, Loader2, Navigation, Search, Wrench,
+  MessageCircle, CheckCircle, XCircle, Camera, Loader2, Navigation, Search, Wrench, FileCheck,
 } from 'lucide-react'
 import { pedidosApi, pagamentosApi } from '../api'
 import type { PedidoOut, TrackingOut, PagamentoOut } from '../api'
@@ -486,6 +486,70 @@ export default function PedidoDetail() {
           </div>
         </div>
 
+        {/* Acordo de serviço — resumo claro do contrato entre cliente e profissional */}
+        {pedido.prestador_nome && !cancelado && (
+          <div className="bg-white dark:bg-surface-900 rounded-2xl p-5 border border-surface-200 dark:border-surface-800">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-8 h-8 rounded-xl grad-brand flex items-center justify-center text-white shrink-0">
+                <FileCheck size={16} />
+              </span>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-surface-900 dark:text-white">Acordo de serviço</h3>
+                <p className="text-[11px] text-surface-500">Condições combinadas entre as duas partes</p>
+              </div>
+              <StatusBadge status={pedido.status} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-3">
+                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Cliente</p>
+                <p className="font-semibold text-surface-900 dark:text-white truncate mt-0.5">{pedido.criador_nome || 'Anónimo'}</p>
+              </div>
+              <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-3">
+                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Prestador</p>
+                <p className="font-semibold text-surface-900 dark:text-white truncate mt-0.5">{pedido.prestador_nome}</p>
+              </div>
+              <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-3">
+                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Serviço</p>
+                <p className="font-semibold text-surface-900 dark:text-white truncate mt-0.5 capitalize">{pedido.categoria}</p>
+              </div>
+              <div className="rounded-xl bg-surface-50 dark:bg-surface-800 p-3">
+                <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Valor acordado</p>
+                <p className="font-bold text-brand-600 mt-0.5">
+                  {valorOrcamento > 0 ? kz(valorOrcamento) : 'A definir'}
+                </p>
+              </div>
+            </div>
+            {valorOrcamento > 0 && (
+              <div className="mt-3 space-y-1 text-xs text-surface-500">
+                <div className="flex items-center justify-between">
+                  <span>Comissão da plataforma ({TAXA_PLATAFORMA_PERCENT}%)</span>
+                  <span className="font-semibold text-surface-700 dark:text-surface-300">{kz(comissao)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Valor para o prestador</span>
+                  <span className="font-semibold text-surface-700 dark:text-surface-300">{kz(valorPrestador)}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2 mt-4">
+              <button
+                onClick={() => navigate(`/chat/${pedido.id}`)}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
+              >
+                <MessageCircle size={15} /> Combinar no chat
+              </button>
+              {pedido.prestador_id && (
+                <button
+                  onClick={() => navigate(`/profissional/${pedido.prestador_id}`)}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 text-sm font-semibold text-surface-700 dark:text-surface-200"
+                >
+                  Ver perfil
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Orçamento e pagamento */}
         {(orcStatus !== 'nao_enviado' || (isPrestador && ['chegou', 'em_andamento'].includes(pedido.status))) && (
           <div className="bg-white dark:bg-surface-900 rounded-2xl p-5 border border-surface-200 dark:border-surface-800 space-y-4">
@@ -777,13 +841,13 @@ export default function PedidoDetail() {
             </button>
           )}
 
-          {/* Chat */}
+          {/* Chat — comunicação direta sempre em destaque */}
           {(isOwner || isPrestador) && !cancelado && (
             <button
               onClick={() => navigate(`/chat/${pedido.id}`)}
-              className="flex items-center justify-center gap-2 px-6 py-3 text-brand-600 border-2 border-brand-200 dark:border-brand-800 rounded-xl font-semibold"
+              className="flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-xl font-bold shadow-md shadow-brand-600/25 hover:bg-brand-700 transition-colors"
             >
-              <MessageCircle size={18} /> Chat
+              <MessageCircle size={18} /> Abrir conversa
             </button>
           )}
         </div>

@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard'
 import PedirSocorro from './pages/PedirSocorro'
 import PedidoDetail from './pages/PedidoDetail'
 import ChatPage from './pages/ChatPage'
+import Conversas from './pages/Conversas'
+import Historico from './pages/Historico'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import Procurar from './pages/Procurar'
@@ -49,6 +51,8 @@ function AppRoutes() {
       <Route path="/procurar" element={<PrivateRoute><Procurar /></PrivateRoute>} />
       <Route path="/mapa" element={<PrivateRoute><Mapa /></PrivateRoute>} />
       <Route path="/pedidos" element={<PrivateRoute><Pedidos /></PrivateRoute>} />
+      <Route path="/conversas" element={<PrivateRoute><Conversas /></PrivateRoute>} />
+      <Route path="/historico" element={<PrivateRoute><Historico /></PrivateRoute>} />
       <Route path="/perfil" element={<PrivateRoute><PerfilConta /></PrivateRoute>} />
       <Route path="/profissional/:id" element={<PrivateRoute><PerfilProfissional /></PrivateRoute>} />
       <Route path="/pedido/:id" element={<PrivateRoute><PedidoDetail /></PrivateRoute>} />

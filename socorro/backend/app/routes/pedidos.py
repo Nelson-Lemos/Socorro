@@ -111,6 +111,104 @@ async def listar_pedidos(
     return [pedido_to_out(p) for p in pedidos]
 
 
+@router.get("/historico")
+async def historico(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Histórico completo do utilizador: pedidos criados e serviços prestados,
+    com resumo estatístico e cronologia de eventos."""
+    result = await db.execute(
+        select(Pedido)
+        .options(selectinload(Pedido.criador), selectinload(Pedido.prestador))
+        .where(or_(Pedido.criado_por_id == current_user.id, Pedido.prestador_id == current_user.id))
+        .order_by(Pedido.criado_em.desc())
+    )
+    pedidos = result.scalars().all()
+
+    criados = [p for p in pedidos if p.criado_por_id == current_user.id]
+    prestados = [p for p in pedidos if p.prestador_id == current_user.id]
+
+    def valor_pago(p: Pedido) -> float:
+        return float(p.valor_acordado or p.valor or 0)
+
+    concluidos = [p for p in pedidos if p.status == StatusPedido.CONCLUIDO]
+    gasto_total = sum(valor_pago(p) for p in criados if p.status == StatusPedido.CONCLUIDO)
+    ganho_total = sum(valor_pago(p) for p in prestados if p.status == StatusPedido.CONCLUIDO)
+
+    # Cronologia de eventos
+    eventos = []
+    for p in pedidos:
+        papel = "cliente" if p.criado_por_id == current_user.id else "prestador"
+        eventos.append({
+            "tipo": "pedido_criado",
+            "pedido_id": str(p.id),
+            "titulo": p.titulo,
+            "categoria": p.categoria,
+            "papel": papel,
+            "em": p.criado_em.isoformat() if p.criado_em else None,
+            "detalhe": f"Pedido criado ({p.categoria})" if papel == "cliente" else "Pedido recebido",
+        })
+        if p.aceito_em:
+            eventos.append({
+                "tipo": "aceite",
+                "pedido_id": str(p.id),
+                "titulo": p.titulo,
+                "categoria": p.categoria,
+                "papel": papel,
+                "em": p.aceito_em.isoformat(),
+                "detalhe": f"Aceite por {p.prestador.nome if p.prestador else 'prestador'}",
+            })
+        if p.orcamento_enviado_em:
+            eventos.append({
+                "tipo": "orcamento",
+                "pedido_id": str(p.id),
+                "titulo": p.titulo,
+                "categoria": p.categoria,
+                "papel": papel,
+                "em": p.orcamento_enviado_em.isoformat(),
+                "detalhe": f"Orçamento enviado ({p.orcamento_status})",
+            })
+        if p.orcamento_aprovado_em:
+            eventos.append({
+                "tipo": "orcamento_aprovado",
+                "pedido_id": str(p.id),
+                "titulo": p.titulo,
+                "categoria": p.categoria,
+                "papel": papel,
+                "em": p.orcamento_aprovado_em.isoformat(),
+                "detalhe": "Orçamento aprovado",
+            })
+        if p.concluido_em:
+            eventos.append({
+                "tipo": "concluido",
+                "pedido_id": str(p.id),
+                "titulo": p.titulo,
+                "categoria": p.categoria,
+                "papel": papel,
+                "em": p.concluido_em.isoformat(),
+                "detalhe": "Serviço concluído",
+            })
+
+    eventos = [e for e in eventos if e["em"]]
+    eventos.sort(key=lambda e: e["em"], reverse=True)
+
+    return {
+        "resumo": {
+            "total_pedidos": len(pedidos),
+            "criados": len(criados),
+            "prestados": len(prestados),
+            "concluidos": len(concluidos),
+            "ativos": len([p for p in pedidos if p.status in ("aberto", "procurando", "a_caminho", "chegou", "em_andamento")]),
+            "cancelados": len([p for p in pedidos if p.status == StatusPedido.CANCELADO]),
+            "gasto_total": round(gasto_total, 2),
+            "ganho_total": round(ganho_total, 2),
+        },
+        "pedidos": [pedido_to_out(p) for p in pedidos],
+        "eventos": eventos[:200],
+    }
+
+
 @router.get("/matching", response_model=List[PedidoOut])
 async def pedidos_matching(
     db: AsyncSession = Depends(get_db),

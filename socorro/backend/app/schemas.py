@@ -91,6 +91,33 @@ class UserOut(BaseModel):
     telefone_verificado: bool = False
     criado_em: datetime
 
+    # Empresa — identidade comercial
+    nome_comercial: Optional[str] = None
+    tipo_entidade: Optional[str] = None
+    logo: Optional[str] = None
+    foto_capa: Optional[str] = None
+    # Contactos
+    telefone_whatsapp: Optional[str] = None
+    website: Optional[str] = None
+    redes_sociais: Optional[str] = None
+    # Localização desagregada
+    provincia: Optional[str] = None
+    municipio: Optional[str] = None
+    bairro: Optional[str] = None
+    endereco: Optional[str] = None
+    ponto_referencia: Optional[str] = None
+    # Serviços
+    categorias_servico: Optional[str] = None
+    atende_estabelecimento: Optional[bool] = False
+    atende_domicilio: Optional[bool] = False
+    areas_atendidas: Optional[str] = None
+    atendimento_24h: Optional[bool] = False
+    # Verificação
+    representante_nome: Optional[str] = None
+    representante_cargo: Optional[str] = None
+    representante_telefone: Optional[str] = None
+    status_verificacao: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -113,6 +140,32 @@ class UserUpdate(BaseModel):
     descricao: Optional[str] = None
     disponibilidade: Optional[str] = None
     raio_atuacao: Optional[int] = None
+
+    # Empresa — identidade comercial
+    nome_comercial: Optional[str] = None
+    tipo_entidade: Optional[str] = None
+    logo: Optional[str] = None
+    foto_capa: Optional[str] = None
+    # Contactos
+    telefone_whatsapp: Optional[str] = None
+    website: Optional[str] = None
+    redes_sociais: Optional[str] = None
+    # Localização desagregada
+    provincia: Optional[str] = None
+    municipio: Optional[str] = None
+    bairro: Optional[str] = None
+    endereco: Optional[str] = None
+    ponto_referencia: Optional[str] = None
+    # Serviços e área de atendimento
+    categorias_servico: Optional[str] = None
+    atende_estabelecimento: Optional[bool] = None
+    atende_domicilio: Optional[bool] = None
+    areas_atendidas: Optional[str] = None
+    atendimento_24h: Optional[bool] = None
+    # Verificação / representante
+    representante_nome: Optional[str] = None
+    representante_cargo: Optional[str] = None
+    representante_telefone: Optional[str] = None
 
 
 class Token(BaseModel):
@@ -289,6 +342,7 @@ class ProfissionalOut(BaseModel):
     dist_km: Optional[float] = None
     avaliacao_media: Optional[float] = None
     total_avaliacoes: int = 0
+    match_score: Optional[float] = None
     # Empresa — identidade comercial
     nome_comercial: Optional[str] = None
     logo: Optional[str] = None

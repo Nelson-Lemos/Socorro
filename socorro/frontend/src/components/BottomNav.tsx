@@ -1,10 +1,11 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Map as MapIcon, ClipboardList, User } from 'lucide-react'
+import { Home, Map as MapIcon, ClipboardList, User, MessageCircle } from 'lucide-react'
 
 const ITEMS = [
   { path: '/dashboard', label: 'Início', icon: Home },
   { path: '/mapa', label: 'Mapa', icon: MapIcon },
   { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+  { path: '/conversas', label: 'Mensagens', icon: MessageCircle },
   { path: '/perfil', label: 'Perfil', icon: User },
 ]
 
@@ -17,7 +18,11 @@ export default function BottomNav() {
       <div className="flex items-center justify-around h-16">
         {ITEMS.map((item) => {
           const Icon = item.icon
-          const active = location.pathname === item.path
+          const path = location.pathname
+          const active =
+            path === item.path ||
+            (item.path !== '/dashboard' && path.startsWith(item.path)) ||
+            (item.path === '/conversas' && path.startsWith('/chat/'))
           return (
             <button
               key={item.path}

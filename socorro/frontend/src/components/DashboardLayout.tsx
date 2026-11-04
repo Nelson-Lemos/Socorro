@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext'
 import BottomNav from './BottomNav'
 import {
   LayoutDashboard, PlusCircle, Map as MapIcon, ClipboardList, User,
-  LogOut, Menu, X, Sun, Moon, Bell, ChevronRight,
+  LogOut, Menu, X, Sun, Moon, Bell, ChevronRight, MessageCircle, History,
 } from 'lucide-react'
 import logoUrl from '../assets/logo.jpeg'
 
@@ -14,6 +14,8 @@ const NAV_ITEMS = [
   { path: '/dashboard', label: 'Início', icon: LayoutDashboard },
   { path: '/mapa', label: 'Mapa', icon: MapIcon },
   { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+  { path: '/conversas', label: 'Mensagens', icon: MessageCircle },
+  { path: '/historico', label: 'Histórico', icon: History },
   { path: '/pedir-socorro', label: 'Pedir Socorro', icon: PlusCircle },
   { path: '/perfil', label: 'Perfil', icon: User },
 ]
@@ -24,6 +26,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const nav = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const isActive = (itemPath: string) => {
+    const path = location.pathname
+    if (path === itemPath) return true
+    if (itemPath === '/dashboard') return false
+    if (path.startsWith(itemPath)) return true
+    if (itemPath === '/conversas' && path.startsWith('/chat/')) return true
+    return false
+  }
 
   return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex">
@@ -36,7 +47,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <nav className="flex-1 px-3 py-4 space-y-1">
           {NAV_ITEMS.map(item => {
             const Icon = item.icon
-            const active = location.pathname === item.path
+            const active = isActive(item.path)
             return (
               <button
                 key={item.path}
@@ -133,7 +144,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <nav className="flex-1 px-3 py-4 space-y-1">
                 {NAV_ITEMS.map(item => {
                   const Icon = item.icon
-                  const active = location.pathname === item.path
+                  const active = isActive(item.path)
                   return (
                     <button
                       key={item.path}

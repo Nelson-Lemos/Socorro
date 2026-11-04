@@ -258,3 +258,61 @@ async def enviar_mensagem(
         criado_em=msg.criado_em,
         remetente_nome=current_user.nome,
     )
+
+
+@router.get("/conversas", response_model=List[dict])
+async def listar_conversas(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lista as conversas do utilizador (como criador ou prestador),
+    com a última mensagem e a contagem de não lidas."""
+    from sqlalchemy import or_ as _or
+
+    result = await db.execute(
+        select(Pedido)
+        .options(selectinload(Pedido.criador), selectinload(Pedido.prestador))
+        .where(_or(Pedido.criado_por_id == current_user.id, Pedido.prestador_id == current_user.id))
+        .order_by(Pedido.atualizado_em.desc())
+    )
+    pedidos = result.scalars().all()
+    if not pedidos:
+        return []
+
+    pedido_ids = [p.id for p in pedidos]
+
+    # Última mensagem por pedido
+    ultimas = await db.execute(
+        select(Mensagem)
+        .options(selectinload(Mensagem.remetente))
+        .where(Mensagem.pedido_id.in_(pedido_ids))
+        .order_by(Mensagem.criado_em.desc())
+    )
+    ultima_por_pedido: Dict[str, Mensagem] = {}
+    total_por_pedido: Dict[str, int] = {}
+    for m in ultimas.scalars().all():
+        pid = str(m.pedido_id)
+        total_por_pedido[pid] = total_por_pedido.get(pid, 0) + 1
+        if pid not in ultima_por_pedido:
+            ultima_por_pedido[pid] = m
+
+    conversas = []
+    for p in pedidos:
+        pid = str(p.id)
+        is_criador = p.criado_por_id == current_user.id
+        outro = p.prestador if is_criador else p.criador
+        ultima = ultima_por_pedido.get(pid)
+        conversas.append({
+            "pedido_id": pid,
+            "titulo": p.titulo,
+            "categoria": p.categoria,
+            "status": p.status,
+            "outro_id": str(outro.id) if outro else None,
+            "outro_nome": (outro.nome if outro else None) or ("Prestador" if is_criador else "Criador"),
+            "outro_foto": (outro.foto_perfil if outro else None),
+            "ultima_mensagem": ultima.conteudo if ultima else None,
+            "ultima_em": ultima.criado_em.isoformat() if ultima else p.atualizado_em.isoformat(),
+            "ultima_de_mim": (ultima.remetente_id == current_user.id) if ultima else False,
+            "total_mensagens": total_por_pedido.get(pid, 0),
+        })
+    return conversas
