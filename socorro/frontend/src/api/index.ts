@@ -303,6 +303,9 @@ export interface TrackingOut {
 }
 
 function getWSSBase(): string {
+  const explicit = (import.meta.env.VITE_WS_URL || '').trim()
+  if (explicit) return explicit.replace(/\/+$/, '')
+
   const apiBase = (import.meta.env.VITE_API_URL || '').trim()
   let host: string
   if (apiBase.startsWith('http')) {
@@ -310,7 +313,7 @@ function getWSSBase(): string {
   } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     host = window.location.host
   } else {
-    host = 'back-socorro.onrender.com'
+    host = 'socorro-1.onrender.com'
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${host}`

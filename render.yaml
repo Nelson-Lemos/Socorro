@@ -1,13 +1,17 @@
 services:
   - type: web
-    name: socorro-backend
+    name: socorro-1
     runtime: python
     rootDir: socorro/backend
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
+      # Definir no painel do Render (Environment) com a URL do Neon.
+      # Ex.: postgresql://neondb_owner:PASSWORD@HOST/neondb?sslmode=require
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_SSL
+        value: "true"
       - key: SECRET_KEY
         generateValue: true
       - key: ALGORITHM
@@ -15,6 +19,8 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: 1440
       - key: CORS_ORIGINS
+        value: https://socorro-phi.vercel.app,http://localhost:5173,http://localhost:3000
+      - key: FRONTEND_URL
         value: https://socorro-phi.vercel.app
       - key: UPLOAD_DIR
         value: ./uploads

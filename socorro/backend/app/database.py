@@ -15,6 +15,16 @@ settings = get_settings()
 # prepared statement cache. O Neon é serverless: as ligações podem ser
 # suspensas/recicladas e o DNS pode falhar de forma transitória, por isso
 # definimos pool_recycle, timeouts e fazemos retry com backoff.
+_connect_args: dict = {
+    "statement_cache_size": 0,
+    "max_cacheable_statement_size": 0,
+    "timeout": 15,          # timeout de ligação (segundos)
+    "command_timeout": 30,  # timeout de comandos
+}
+if settings.DATABASE_SSL:
+    # Neon (e a maioria dos Postgres geridos) exige SSL.
+    _connect_args["ssl"] = True
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
@@ -23,13 +33,7 @@ engine = create_async_engine(
     pool_size=5,
     max_overflow=10,
     pool_timeout=30,
-    connect_args={
-        "ssl": True,
-        "statement_cache_size": 0,
-        "max_cacheable_statement_size": 0,
-        "timeout": 15,          # timeout de ligação (segundos)
-        "command_timeout": 30,  # timeout de comandos
-    },
+    connect_args=_connect_args,
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

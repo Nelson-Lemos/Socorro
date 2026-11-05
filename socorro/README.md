@@ -119,3 +119,56 @@ socorro-platform/
 ### Avaliações
 - `GET /avaliacoes/{user_id}` - Listar avaliações
 - `POST /avaliacoes/{pedido_id}` - Criar avaliação
+
+## Produção
+
+| Serviço | URL |
+|---------|-----|
+| Frontend (Vercel) | https://socorro-phi.vercel.app |
+| Backend (Render) | https://socorro-1.onrender.com |
+| Base de dados | Neon PostgreSQL |
+
+### Backend — Render
+
+Configurar em **Environment** no painel do Render:
+
+| Variável | Valor |
+|----------|-------|
+| `DATABASE_URL` | URL do Neon (pode colar a original, com `?sslmode=require`) |
+| `DATABASE_SSL` | `true` |
+| `SECRET_KEY` | chave aleatória forte (gerar no Render) |
+| `CORS_ORIGINS` | `https://socorro-phi.vercel.app,http://localhost:5173,http://localhost:3000` |
+| `FRONTEND_URL` | `https://socorro-phi.vercel.app` |
+| `UPLOAD_DIR` | `./uploads` |
+| `MAX_UPLOAD_SIZE` | `10485760` |
+| `REDIS_URL` | vazio (ou URL de um Redis gerido) |
+
+A aplicação normaliza automaticamente a URL do Neon para o driver
+`asyncpg` e remove `sslmode`/`channel_binding`, que o asyncpg não aceita.
+
+As migrações correm no arranque: `alembic upgrade head && uvicorn ...`.
+
+### Frontend — Vercel
+
+O `vercel.json` encaminha `/api/*` e `/uploads/*` para o backend no Render.
+Os WebSockets ligam diretamente a `wss://socorro-1.onrender.com`.
+
+Se existirem variáveis `VITE_API_URL` ou `VITE_WS_URL` no painel da Vercel,
+remover ou apontar para `https://socorro-1.onrender.com`.
+
+### Verificação
+
+```bash
+curl https://socorro-1.onrender.com/health
+curl https://socorro-1.onrender.com/health/db
+```
+
+`/health/db` deve devolver `{"status":"ok","database":"ok"}`.
+
+### Notas
+
+- O disco do Render é efémero: uploads guardados em `./uploads` perdem-se
+  a cada deploy/restart. Para produção, usar armazenamento externo
+  (S3, Cloudinary, etc.).
+- A recuperação de password usa Redis. Sem `REDIS_URL`, o link é apenas
+  impresso nos logs do servidor.

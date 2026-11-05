@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
 from datetime import datetime
+from app.config import get_settings
 from app.database import get_db
 from app.models import User
 from app.schemas import (
@@ -16,6 +17,7 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+settings = get_settings()
 
 
 @router.post("/register", response_model=Token, status_code=201)
@@ -145,7 +147,10 @@ async def esqueci_password(data: PasswordResetRequest, db: AsyncSession = Depend
     if user:
         reset_token = uuid.uuid4().hex
         await store_password_reset(str(user.id), reset_token)
-        print(f"[DEV MODE] Password reset para {data.email}: http://localhost:5173/redefinir-password?token={reset_token}")
+        print(
+            f"[DEV MODE] Password reset para {data.email}: "
+            f"{settings.FRONTEND_URL.rstrip('/')}/redefinir-password?token={reset_token}"
+        )
 
     return {"message": "Se o email existir, receberás um link de redefinição"}
 
