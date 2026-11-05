@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine.url import make_url
+from sqlalchemy.exc import ArgumentError
 
 # socorro/backend
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -64,7 +65,21 @@ class Settings(BaseSettings):
         como argumentos de ligação, por isso removemos esses parâmetros e
         guardamos a necessidade de SSL em ``DATABASE_SSL``.
         """
-        url = make_url(self.DATABASE_URL)
+        raw = (self.DATABASE_URL or "").strip()
+
+        # Tolera o valor colado como comando do psql, por exemplo:
+        #   psql 'postgresql://user:pass@host/db?sslmode=require'
+        if raw.lower().startswith("psql "):
+            raw = raw[5:].strip()
+        raw = raw.strip("'\"").strip()
+
+        try:
+            url = make_url(raw)
+        except ArgumentError as exc:
+            raise ValueError(
+                "DATABASE_URL inválida. Usa apenas a URL PostgreSQL "
+                "(sem o comando 'psql' e sem aspas)."
+            ) from exc
 
         if url.drivername.startswith("postgres") and url.drivername != "postgresql+asyncpg":
             url = url.set(drivername="postgresql+asyncpg")
