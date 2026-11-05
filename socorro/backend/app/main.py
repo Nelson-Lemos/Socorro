@@ -11,7 +11,7 @@ settings = get_settings()
 app = FastAPI(
     title="Socorro! API",
     description="Plataforma de ajuda mútua para Angola",
-    version="2.0.0",
+    version="2.1.0",
 )
 
 # CORS
@@ -40,7 +40,7 @@ app.include_router(uploads.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "Socorro! API", "version": "2.0.0"}
+    return {"status": "ok", "service": "Socorro! API", "version": "2.1.0"}
 
 
 @app.get("/health/db")
@@ -54,6 +54,6 @@ async def health_db():
 async def root():
     return {
         "name": "Socorro! API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "docs": "/docs",
     }
